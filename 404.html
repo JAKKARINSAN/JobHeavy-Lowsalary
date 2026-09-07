@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>กำลังเชื่อมต่อ...</title>
+  <title>JobHeavy-Lowsalary</title>
 </head>
 <body>
 <script>
@@ -24,11 +24,13 @@
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1500);
+    const timer = setTimeout(() => controller.abort(), 2000);
 
     const res = await fetch(LAN + "/health", {
       method: "GET",
+      mode: "cors",
       cache: "no-store",
+      targetAddressSpace: "local",
       signal: controller.signal
     });
 
@@ -38,6 +40,7 @@
       base = LAN;
     }
   } catch (e) {
+    console.log("LAN ใช้ไม่ได้:", e);
   }
 
   if (!base) {
@@ -51,6 +54,7 @@
         base = (await res.text()).trim();
       }
     } catch (e) {
+      console.log("Cloudflare ใช้ไม่ได้:", e);
     }
   }
 
