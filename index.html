@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobHeavy-Lowsalary</title>
+</head>
+<body>
+<script>
+(async () => {
+  const REPO = "/JobHeavy-Lowsalary";
+  const LAN = "http://ne1-debt/8097";
+  const CLOUDFLARE = "https://divine-bonus-81c5.jakkarinsangsuwan.workers.dev";
+
+  const path = location.pathname.startsWith(REPO)
+    ? location.pathname.slice(REPO.length)
+    : location.pathname;
+
+  const targetPath = path || "/";
+  const query = location.search || "";
+  const hash = location.hash || "";
+
+  let base = "";
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+
+    const res = await fetch(LAN + "/health", {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    clearTimeout(timer);
+
+    if (res.ok) {
+      base = LAN;
+    }
+  } catch (e) {
+  }
+
+  if (!base) {
+    try {
+      const res = await fetch(CLOUDFLARE + "/", {
+        method: "GET",
+        cache: "no-store"
+      });
+
+      if (res.ok) {
+        base = (await res.text()).trim();
+      }
+    } catch (e) {
+    }
+  }
+
+  if (!base) {
+    document.body.innerText = "ไม่สามารถเชื่อมต่อ LAN หรือ ngrok ได้";
+    return;
+  }
+
+  const target =
+    base.replace(/\/+$/, "") +
+    "/" +
+    targetPath.replace(/^\/+/, "") +
+    query +
+    hash;
+
+  location.replace(target);
+})();
+</script>
+</body>
+</html>
