@@ -2,7 +2,8 @@
 
 หน้า redirect สำหรับเลือก LAN ก่อน แล้วใช้ URL ของ ngrok ที่ Cloudflare Worker ส่งกลับ
 
-- ตรวจ LAN ภายใน 2 วินาที และตรวจ Cloudflare ภายใน 5 วินาที รวมเวลาอ่าน response
+- แสดงคำอธิบายก่อนเริ่มเชื่อมต่อ และตรวจ LAN เมื่อผู้ใช้กดปุ่มเท่านั้น ปุ่มเชื่อมต่อสำรองจะข้ามการตรวจ LAN
+- ตรวจ LAN ภายใน 15 วินาทีเพื่อให้เวลากดอนุญาต และตรวจ Cloudflare ภายใน 5 วินาที รวมเวลาอ่าน response
 - Worker ต้องส่ง URL แบบข้อความธรรมดา ใช้ HTTPS ไม่มี username/password, port พิเศษ, query หรือ hash
 - รองรับ subdomain ของ `ngrok-free.app`, `ngrok-free.dev`, `ngrok.app`, `ngrok.dev` และ `ngrok.io`
 - หากใช้โดเมนส่วนตัว ให้เพิ่ม hostname ใน `ALLOWED_TUNNEL_HOSTS` ของทั้งสองไฟล์ รายการ suffix อนุญาตทุก subdomain ของผู้ให้บริการ หากมี hostname คงที่ ควรระบุ hostname นั้นและล้าง `ALLOWED_TUNNEL_SUFFIXES`

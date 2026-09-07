@@ -4,12 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JobHeavy-Lowsalary</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #f3f6fa; color: #172b4d; font-family: system-ui, sans-serif; line-height: 1.7; }
+    main { max-width: 600px; margin: 8vh auto; padding: 28px; background: white; border-radius: 16px; }
+    h1 { margin-top: 0; font-size: 1.5rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    button { padding: 12px 18px; border: 1px solid #2459a9; border-radius: 8px; background: #2459a9; color: white; font: inherit; cursor: pointer; }
+    #connect-backup { background: white; color: #2459a9; }
+    button:disabled { opacity: .55; cursor: wait; }
+    button:focus-visible { outline: 3px solid #b45309; outline-offset: 3px; }
+    #status { min-height: 1.7em; }
+  </style>
 </head>
 <body>
-<p id="status" role="status">กำลังตรวจสอบการเชื่อมต่อ...</p>
+<main>
+<h1>เชื่อมต่อระบบ JobHeavy-Lowsalary</h1>
+<p>หากใช้งานในเครือข่ายภายใน ให้เลือก “เชื่อมต่อเครือข่ายภายใน” เพื่อให้เว็บไซต์ตรวจการเชื่อมต่อกับระบบ <strong>ne1-debt</strong></p>
+<p>เบราว์เซอร์อาจถามสิทธิ์เข้าถึงอุปกรณ์ในเครือข่ายภายใน กรุณาเลือก <strong>“อนุญาต”</strong> หากต้องการเชื่อมต่อด้วยวิธีนี้</p>
+<p>หากอยู่นอกเครือข่ายหรือไม่ต้องการให้สิทธิ์ ให้เลือก “ใช้การเชื่อมต่อสำรอง” หากตรวจเครือข่ายภายในไม่สำเร็จ ระบบจะลองใช้การเชื่อมต่อสำรองให้</p>
+<div class="actions">
+  <button id="connect-lan" type="button" disabled>เชื่อมต่อเครือข่ายภายใน</button>
+  <button id="connect-backup" type="button" disabled>ใช้การเชื่อมต่อสำรอง</button>
+</div>
+<p id="status" role="status">เลือกวิธีเชื่อมต่อเพื่อเริ่มใช้งาน</p>
 <noscript>กรุณาเปิด JavaScript เพื่อเชื่อมต่อระบบ</noscript>
+</main>
 <script>
-(async () => {
+(() => {
   const REPO = "/JobHeavy-Lowsalary";
   const LAN = "http://ne1-debt";
   const CLOUDFLARE = "https://divine-bonus-81c5.jakkarinsangsuwan.workers.dev";
@@ -17,6 +38,9 @@
   const ALLOWED_TUNNEL_HOSTS = [];
   const ALLOWED_TUNNEL_SUFFIXES = [".ngrok-free.app", ".ngrok-free.dev", ".ngrok.app", ".ngrok.dev", ".ngrok.io"];
   const status = document.getElementById("status");
+  const lanButton = document.getElementById("connect-lan");
+  const backupButton = document.getElementById("connect-backup");
+  let connecting = false;
 
   const path = (location.pathname === REPO || location.pathname.startsWith(REPO + "/"))
     ? location.pathname.slice(REPO.length)
@@ -25,8 +49,6 @@
   const targetPath = path || "/";
   const query = location.search || "";
   const hash = location.hash || "";
-
-  let base = "";
 
   async function fetchWithTimeout(url, options, timeout, readResponse) {
     const controller = new AbortController();
@@ -53,51 +75,69 @@
     return url.href;
   }
 
-  try {
-    await fetchWithTimeout(LAN + "/", {
-      method: "GET",
-      mode: "no-cors",
-      credentials: "omit",
-      cache: "no-store",
-      targetAddressSpace: "local"
-    }, 2000, () => true);
-    base = LAN;
-  } catch (e) {
-    console.log("LAN ใช้ไม่ได้:", e);
-  }
-
-  if (!base) {
-    status.textContent = "กำลังตรวจสอบการเชื่อมต่อสำรอง...";
+  async function connect(useLan) {
+    if (connecting) return;
+    connecting = true;
+    lanButton.disabled = backupButton.disabled = true;
+    let base = "";
     try {
-      const value = await fetchWithTimeout(CLOUDFLARE + "/", {
-        method: "GET",
-        cache: "no-store"
-      }, 5000, res => res.text());
-      base = validateTunnelBase(value);
-    } catch (e) {
-      console.log("Cloudflare ใช้ไม่ได้:", e);
+      if (useLan) {
+        status.textContent = "กำลังตรวจเครือข่ายภายใน หากเบราว์เซอร์ถาม กรุณาเลือกอนุญาต...";
+        try {
+          await fetchWithTimeout(LAN + "/", {
+            method: "GET",
+            mode: "no-cors",
+            credentials: "omit",
+            cache: "no-store",
+            targetAddressSpace: "local"
+          }, 15000, () => true);
+          base = LAN;
+        } catch (e) {
+          console.log("LAN ใช้ไม่ได้:", e);
+        }
+      }
+    
+      if (!base) {
+        status.textContent = "กำลังตรวจสอบการเชื่อมต่อสำรอง...";
+        try {
+          const value = await fetchWithTimeout(CLOUDFLARE + "/", {
+            method: "GET",
+            cache: "no-store"
+          }, 5000, res => res.text());
+          base = validateTunnelBase(value);
+        } catch (e) {
+          console.log("Cloudflare ใช้ไม่ได้:", e);
+        }
+      }
+    
+      if (!base) {
+        status.textContent = "ไม่สามารถเชื่อมต่อ LAN หรือ ngrok ได้ กรุณาลองโหลดหน้าใหม่อีกครั้ง";
+        return;
+      }
+    
+      const target =
+        base.replace(/\/+$/, "") +
+        "/" +
+        targetPath.replace(/^\/+/, "") +
+        query +
+        hash;
+    
+      status.textContent = "กำลังเข้าสู่ระบบ...";
+      try {
+        location.replace(target);
+      } catch (e) {
+        console.log("Redirect ใช้ไม่ได้:", e);
+        status.textContent = "ไม่สามารถเปิดปลายทางได้ กรุณาลองโหลดหน้าใหม่อีกครั้ง";
+      }
+    } finally {
+      connecting = false;
+      lanButton.disabled = backupButton.disabled = false;
     }
   }
 
-  if (!base) {
-    status.textContent = "ไม่สามารถเชื่อมต่อ LAN หรือ ngrok ได้ กรุณาลองโหลดหน้าใหม่อีกครั้ง";
-    return;
-  }
-
-  const target =
-    base.replace(/\/+$/, "") +
-    "/" +
-    targetPath.replace(/^\/+/, "") +
-    query +
-    hash;
-
-  status.textContent = "กำลังเข้าสู่ระบบ...";
-  try {
-    location.replace(target);
-  } catch (e) {
-    console.log("Redirect ใช้ไม่ได้:", e);
-    status.textContent = "ไม่สามารถเปิดปลายทางได้ กรุณาลองโหลดหน้าใหม่อีกครั้ง";
-  }
+  lanButton.addEventListener("click", () => connect(true));
+  backupButton.addEventListener("click", () => connect(false));
+  lanButton.disabled = backupButton.disabled = false;
 })();
 </script>
 </body>
