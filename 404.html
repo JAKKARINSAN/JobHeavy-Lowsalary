@@ -6,13 +6,19 @@
   <title>JobHeavy-Lowsalary</title>
 </head>
 <body>
+<p id="status" role="status">กำลังตรวจสอบการเชื่อมต่อ...</p>
+<noscript>กรุณาเปิด JavaScript เพื่อเชื่อมต่อระบบ</noscript>
 <script>
 (async () => {
   const REPO = "/JobHeavy-Lowsalary";
   const LAN = "http://ne1-debt";
   const CLOUDFLARE = "https://divine-bonus-81c5.jakkarinsangsuwan.workers.dev";
+  // Add a custom tunnel hostname here if it is not an ngrok subdomain.
+  const ALLOWED_TUNNEL_HOSTS = [];
+  const ALLOWED_TUNNEL_SUFFIXES = [".ngrok-free.app", ".ngrok-free.dev", ".ngrok.app", ".ngrok.dev", ".ngrok.io"];
+  const status = document.getElementById("status");
 
-  const path = location.pathname.startsWith(REPO)
+  const path = (location.pathname === REPO || location.pathname.startsWith(REPO + "/"))
     ? location.pathname.slice(REPO.length)
     : location.pathname;
 
@@ -22,44 +28,59 @@
 
   let base = "";
 
-  try {
+  async function fetchWithTimeout(url, options, timeout, readResponse) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
-
-    const res = await fetch(LAN + "/health", {
-      method: "GET",
-      mode: "cors",
-      cache: "no-store",
-      targetAddressSpace: "local",
-      signal: controller.signal
-    });
-
-    clearTimeout(timer);
-
-    if (res.ok) {
-      base = LAN;
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      // A no-cors LAN probe returns an opaque response: status is unavailable.
+      const reachableLan = options.mode === "no-cors" && res.type === "opaque";
+      if (!res.ok && !reachableLan) throw new Error("HTTP " + res.status);
+      return await readResponse(res);
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  function validateTunnelBase(value) {
+    const url = new URL(value.trim());
+    const allowedHost = ALLOWED_TUNNEL_HOSTS.includes(url.hostname) ||
+      ALLOWED_TUNNEL_SUFFIXES.some(suffix => url.hostname.endsWith(suffix));
+    if (url.protocol !== "https:" || !allowedHost || url.username || url.password ||
+        url.port || url.search || url.hash) {
+      throw new Error("Invalid tunnel URL");
+    }
+    return url.href;
+  }
+
+  try {
+    await fetchWithTimeout(LAN + "/", {
+      method: "GET",
+      mode: "no-cors",
+      credentials: "omit",
+      cache: "no-store",
+      targetAddressSpace: "local"
+    }, 2000, () => true);
+    base = LAN;
   } catch (e) {
     console.log("LAN ใช้ไม่ได้:", e);
   }
 
   if (!base) {
+    status.textContent = "กำลังตรวจสอบการเชื่อมต่อสำรอง...";
     try {
-      const res = await fetch(CLOUDFLARE + "/", {
+      const value = await fetchWithTimeout(CLOUDFLARE + "/", {
         method: "GET",
         cache: "no-store"
-      });
-
-      if (res.ok) {
-        base = (await res.text()).trim();
-      }
+      }, 5000, res => res.text());
+      base = validateTunnelBase(value);
     } catch (e) {
       console.log("Cloudflare ใช้ไม่ได้:", e);
     }
   }
 
   if (!base) {
-    document.body.innerText = "ไม่สามารถเชื่อมต่อ LAN หรือ ngrok ได้";
+    status.textContent = "ไม่สามารถเชื่อมต่อ LAN หรือ ngrok ได้ กรุณาลองโหลดหน้าใหม่อีกครั้ง";
     return;
   }
 
@@ -70,7 +91,13 @@
     query +
     hash;
 
-  location.replace(target);
+  status.textContent = "กำลังเข้าสู่ระบบ...";
+  try {
+    location.replace(target);
+  } catch (e) {
+    console.log("Redirect ใช้ไม่ได้:", e);
+    status.textContent = "ไม่สามารถเปิดปลายทางได้ กรุณาลองโหลดหน้าใหม่อีกครั้ง";
+  }
 })();
 </script>
 </body>
